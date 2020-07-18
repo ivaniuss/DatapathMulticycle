@@ -3,7 +3,8 @@
 // From David_Harris and Sarah_Harris book design
 // Multicycle MIPS processor
 //------------------------------------------------
-
+`include "alu.v"
+`include "mipsparts.v"
 module mips(input         clk, reset,
             output [31:0] adr, writedata,
             output        memwrite,
@@ -21,13 +22,13 @@ module mips(input         clk, reset,
                pcen, memwrite, irwrite, regwrite,
                alusrca, iord, memtoreg, regdst, 
                alusrcb, pcsrc, alucontrol); 
-/*  datapath dp(clk, reset, 
+  datapath dp(clk, reset, 
               pcen, irwrite, regwrite,
               alusrca, iord, memtoreg, regdst,
               alusrcb, pcsrc, alucontrol,  
               op, funct, zero,
               adr, writedata, readdata);
-*/
+
 endmodule
 
 module controller(input        clk, reset,
@@ -189,8 +190,6 @@ module aludec(input  [5:0] funct,
 endmodule
 
 
-
-/*
 // Complete the datapath module below for Lab 11.
 // You do not need to complete this module for Lab 10
 
@@ -203,7 +202,7 @@ module datapath(input         clk, reset,
                 input         pcen, irwrite, regwrite,
                 input         alusrca, iord, memtoreg, regdst,
                 input  [1:0]  alusrcb, pcsrc, 
-                input  [2:0]  alucontrol,
+                input  [3:0]  alucontrol,
                 output [5:0]  op, funct,
                 output        zero,
                 output [31:0] adr, writedata, 
@@ -211,14 +210,14 @@ module datapath(input         clk, reset,
 
   // Below are the internal signals of the datapath module.
 
-  reg [4:0]  writereg;
-  reg [31:0] pcnext, pc;
-  reg [31:0] instr, data, srca, srcb;
-  reg [31:0] a;
-  reg [31:0] aluresult, aluout;
-  reg [31:0] signimm;   // the sign-extended immediate
-  reg [31:0] signimmsh;	// the sign-extended immediate shifted left by 2
-  reg [31:0] wd3, rd1, rd2;
+  wire [4:0]  writereg;
+  wire [31:0] pcnext, pc;
+  wire [31:0] instr, data, srca, srcb;
+  wire [31:0] a;
+  wire [31:0] aluresult, aluout;
+  wire [31:0] signimm;   // the sign-extended immediate
+  wire [31:0] signimmsh;	// the sign-extended immediate shifted left by 2
+  wire [31:0] wd3, rd1, rd2;
 
   // op and funct fields to controller
   assign op = instr[31:26];
@@ -239,30 +238,23 @@ module datapath(input         clk, reset,
   // ADD CODE HERE
 
   // datapath
- 
+
+  flopenr #(32) pcreg(clk, reset, pcen, pcnext, pc);
+  mux2    #(32) adrmux(pc, aluout, iord, adr);
+  flopenr #(32) instrreg(clk, reset, irwrite,readdata, instr);
+  flopr   #(32) datareg(clk, reset, readdata, data);
+  mux2 #(5)   regdstmux(instr[20:16],instr[15:11], regdst, writereg);
+  mux2 #(32)  wdmux(aluout, data, memtoreg, wd3);
+  regfile     rf(clk, regwrite, instr[25:21],instr[20:16],writereg, wd3, rd1, rd2);
+  signext     se(instr[15:0], signimm);
+  sl2         immsh(signimm, signimmsh);
+  flopr #(32) areg(clk, reset, rd1, a);
+  flopr #(32) breg(clk, reset, rd2, writedata);
+  mux2  #(32) srcamux(pc, a, alusrca, srca);
+  mux4  #(32) srcbmux(writedata, 32'b100,signimm, signimmsh,alusrcb, srcb);
+
+  alu         alu(alucontrol, srca, srcb,aluresult, zero);
+  flopr #(32) alureg(clk, reset, aluresult, aluout);
+  mux3  #(32) pcmux(aluresult, aluout,{pc[31:28], instr[25:0], 2'b00},pcsrc, pcnext);
+
 endmodule
-
-
-module mux3 #(parameter WIDTH = 8)
-             (input  [WIDTH-1:0] d0, d1, d2,
-              input  [1:0]       s, 
-              output [WIDTH-1:0] y);
-
-  assign #1 y = s[1] ? d2 : (s[0] ? d1 : d0); 
-endmodule
-
-module mux4 #(parameter WIDTH = 8)
-             (input  [WIDTH-1:0] d0, d1, d2, d3,
-              input  [1:0]       s, 
-              output [WIDTH-1:0] y);
-
-   always_comb
-      case(s)
-         2'b00: y <= d0;
-         2'b01: y <= d1;
-         2'b10: y <= d2;
-         2'b11: y <= d3;
-      endcase
-endmodule
-
-*/
